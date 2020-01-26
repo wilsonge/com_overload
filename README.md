@@ -4,6 +4,8 @@ COPYRIGHT AND DISCLAIMER
 Overload! - Mass content creator for demo and testing purposes
 Copyright (C) 2011  Nicholas K. Dionysopoulos / AkeebaBackup.com
 
+Modified 2020 George Wilson
+
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
@@ -20,20 +22,14 @@ along with this program.  If not, see [the on-line version](http://www.gnu.org/l
 The full text of the license can be found in the LICENSE.txt file inside all of
 our ZIP packages.
 
-CONTACT AND SUPPORT
-===================
+How to Install
+===========================
+Run from the root of the repo `zip -r com_overload.zip . -x '*.git*' -x '*.idea*'`
 
-If you have further questions, you can contact the author directly by emailing
-at nicholas@akeebabackup.com. Alternatively, you can send a Twitter message to
-@akeebabackup or @nikosdion. If you wish to contact us by Instant Messaging or
-Skype voice call, please leave a Personal Message to user "nicholas" on our
-official site http://www.akeebabackup.com stating the reason of communication,
-your Skype handle and timezone so that we can arrange for such communication.
-
-DOCUMENTATION AND DOWNLOADS
+Original Source
 ===========================
 
-Everything is hosted on the GitHub repository at
+Everything is based on the  original GitHub repository at
 https://github.com/nikosdion/com_overload
 
 GET INVOLVED
@@ -55,6 +51,10 @@ CHANGELOG
 
 The Changelog is provided in reverse chronological order.
 Legend: # Bug fix     + Addition     - Feature removal     ~ Change    ! Critical bug fix     ^ Minor edit
+
+Version 2.0 (2020)
+-----------------------------
+    + Change to support Joomla 4 only
 
 Version 1.2 (August 1st, 2011)
 -----------------------------

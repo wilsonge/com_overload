@@ -18,7 +18,7 @@ defined('_JEXEC') or die(); ?>
 	<legend><?php echo JText::_('COM_OVERLOAD_CCOPTS_LEGEND') ?></legend>
 
 	<!-- 1000 * (3^3 + 3^2 + 3^1) -->
-	
+
 	<table>
 		<tr>
 			<td>
@@ -90,5 +90,5 @@ defined('_JEXEC') or die(); ?>
 </fieldset>
 
 <script type="text/javascript">
-	ajax_url = '<?php echo JURI::base().'index.php?option=com_overload&view=process' ?>';
+	ajax_url = '<?php echo JUri::base().'index.php?option=com_overload&view=process' ?>';
 </script>

@@ -1,12 +1,19 @@
 <?php
 
+namespace Wilsonge\Component\Overload\Administrator\Model;
+
 defined('_JEXEC') or die();
 
-class OverloadModelProcess extends FOFModel
+use Joomla\CMS\MVC\Model\BaseDatabaseModel;
+use Joomla\CMS\Log\Log;
+use Joomla\CMS\Factory;
+use Joomla\CMS\Uri\Uri;
+
+class ProcessModel extends BaseDatabaseModel
 {
 	/** @var int Stores the timestamp when the real processing started */
 	private $_timerStart = null;
-	
+
 	/**
 	 * Starts the operation timer, used to safeguard us against server timeouts
 	 */
@@ -14,7 +21,7 @@ class OverloadModelProcess extends FOFModel
 	{
 		$this->_timerStart = microtime(true);
 	}
-	
+
 	/**
 	 * Checks if there is enough time to continue processing. This is an
 	 * inflexible implementation which assumes that up to 4 seconds per
@@ -23,7 +30,7 @@ class OverloadModelProcess extends FOFModel
 	 * Increasing it to 10 seconds doesn't make the process considerably faster,
 	 * but frustrates the user as he's staring at an apparently stuck page for
 	 * ten seconds before seeing anything happening. Not good!
-	 * 
+	 *
 	 * @return bool True if we are within our time constraints.
 	 */
 	private function haveEnoughTime()
@@ -36,7 +43,7 @@ class OverloadModelProcess extends FOFModel
 	/**
 	 * Generates a category level mapping, i.e. an array containing a category
 	 * hierarchy based on the category and depth preferences.
-	 * 
+	 *
 	 * @param type $categories
 	 * @param type $depth
 	 * @param type $prefix
@@ -56,57 +63,57 @@ class OverloadModelProcess extends FOFModel
 				}
 			}
 		}
-		
+
 		return $ret;
 	}
-	
+
 	/**
 	 * Begins the content overload process
-	 * @return bool 
+	 * @return bool
 	 */
 	public function start()
 	{
 		$categories = $this->getState('categories');
 		$depth = $this->getState('depth');
 		$logger = $this->getState('logger');
-		
-		JLog::add('Calculating total number of categories', JLog::DEBUG);
-		
+
+		Log::add('Calculating total number of categories', Log::DEBUG);
+
 		$totalcats = 0;
 		for($i = $depth; $i > 0; $i --) {
 			$totalcats += pow($categories, $i);
 		}
-		
-		JLog::add('Creating level map', JLog::DEBUG);
-		
+
+		Log::add('Creating level map', Log::DEBUG);
+
 		$killme = $this->makeLevelmap($categories, $depth);
 		$levelmap = array();
 		foreach($killme as $key) {
 			$levelmap[$key] = 0;
 		}
-		
+
 		$this->setState('totalcats', $totalcats);
 		$this->setState('donecats', 0);
 		$this->setState('level', 0);
 		$this->setState('levelmap', $levelmap);
-		
-		JLog::add('Starting the engines!', JLog::DEBUG);
-		
+
+		Log::add('Starting the engines!', Log::DEBUG);
+
 		$this->startTimer();
 		$this->makeCategories();
 		return $this->process();
 	}
-	
+
 	/**
 	 * Internal function called to persist the model state between successive
 	 * AJAX calls.
-	 * 
+	 *
 	 */
 	private function suspend()
 	{
 		$logger = $this->getState('logger');
-		JLog::add('Saving model state to the session', JLog::DEBUG);
-		
+		Log::add('Saving model state to the session', Log::DEBUG);
+
 		$saveData = array(
 			'level'				=> $this->getState('level', 0),
 			'levelmap'			=> $this->getState('levelmap', array()),
@@ -118,31 +125,31 @@ class OverloadModelProcess extends FOFModel
 			'totalcats'			=> $this->getState('totalcats', 0),
 			'donecats'			=> $this->getState('donecats', 0)
 		);
-		
+
 		$saveData = base64_encode(gzcompress(serialize($saveData), 9));
 		if(strlen($saveData) > 10240) die("The serialized data is too big for Joomla! 1.6+ to handle in the tiny-weenie session storage: ".strlen($saveData));
-		
-		JFactory::getSession()->set('savedata', $saveData, 'comoverload');
+
+		Factory::getSession()->set('savedata', $saveData, 'comoverload');
 	}
-	
+
 	/**
 	 * Resumes the content overloading process
-	 * @return type 
+	 * @return type
 	 */
 	public function resume()
 	{
 		$logger = $this->getState('logger');
-		
-		JLog::add('Loading the model state from the session', JLog::DEBUG);
-		
-		$saveData = JFactory::getSession()->get('savedata', '', 'comoverload');
+
+		Log::add('Loading the model state from the session', Log::DEBUG);
+
+		$saveData = Factory::getSession()->get('savedata', '', 'comoverload');
 		$saveData = unserialize(gzuncompress(base64_decode($saveData)));
-		
+
 		if(empty($saveData)) {
-			JLog::add('Nothing is saved in the session. Brace yourself, we are crashing!', JLog::ERROR);
+			Log::add('Nothing is saved in the session. Brace yourself, we are crashing!', Log::ERROR);
 			die('Nothing is saved in the session. Brace yourself, we are crashing! ......... KA-BOOM! All passengers dead.');
 		}
-		
+
 		$this->setState('level', $saveData['level']);
 		$this->setState('levelmap', $saveData['levelmap']);
 		$this->setState('categories', $saveData['categories']);
@@ -152,54 +159,52 @@ class OverloadModelProcess extends FOFModel
 		$this->setState('startfromarticle', $saveData['startfromarticle']);
 		$this->setState('totalcats', $saveData['totalcats']);
 		$this->setState('donecats', $saveData['donecats']);
-		
-		JLog::add('(Re-)starting the engines!', JLog::DEBUG);
-		
+
+		Log::add('(Re-)starting the engines!', Log::DEBUG);
+
 		$this->startTimer();
 		return $this->process();
 	}
-	
+
 	/**
 	 * The main feature of this model: creating faux articles!
-	 * @return type 
+	 * @return type
 	 */
 	private function process()
 	{
 		$logger = $this->getState('logger');
-		JLog::add('Entering main processing loop');
-		
+		Log::add('Entering main processing loop');
+
 		$articles = $this->getState('articles');
 		$levelmap = $this->getState('levelmap');
 		$level = $this->getState('level');
-		
+
 		$currentArticle = 0;
-		
-		JTable::addIncludePath(JPATH_ADMINISTRATOR.'/components/com_content/tables');
-		
+
 		while($this->haveEnoughTime() && !empty($levelmap))
 		{
 			if($level == 0) {
 				$keys = array_keys($levelmap);
 				$level = array_shift($keys);
-				JLog::add('Beginning content creation in category '.$level);
+				Log::add('Beginning content creation in category '.$level);
 				$startFromArticle = 0;
 			} else {
 				$startFromArticle = $this->getState('startfromarticle', 0);
-				JLog::add("Resuming content creation (article #$startFromArticle)", JLog::DEBUG);
+				Log::add("Resuming content creation (article #$startFromArticle)", Log::DEBUG);
 			}
-			
+
 			$copy = $levelmap;
 			$level_id = array_shift($copy);
-			
-			JLog::add("Level ID $level_id", JLog::DEBUG);
-			
+
+			Log::add("Level ID $level_id", Log::DEBUG);
+
 			for($currentArticle = $startFromArticle; $currentArticle < $articles; $currentArticle++) {
 				if(!$this->haveEnoughTime()) break;
 				$this->createArticle_usingModel($level_id, $level, $currentArticle);
 			}
-			
+
 			if($currentArticle == $articles) {
-				JLog::add("Finished processing category", JLog::DEBUG);
+				Log::add("Finished processing category", Log::DEBUG);
 				$currentArticle = 0;
 				$level = 0;
 				array_shift($levelmap);
@@ -208,21 +213,21 @@ class OverloadModelProcess extends FOFModel
 				$this->setState('donecats', $donecats);
 			}
 		}
-		
-		JLog::add("Updating model state", JLog::DEBUG);
+
+		Log::add("Updating model state", Log::DEBUG);
 		$this->setState('levelmap', $levelmap);
 		$this->setState('level', $level);
 		$this->setState('startfromarticle', $currentArticle);
-		
+
 		if(empty($levelmap)) {
-			JLog::add("We are finished!");
+			Log::add("We are finished!");
 			return true;
 		}
-		
+
 		$this->suspend();
 		return false;
 	}
-	
+
 	/**
 	 * Generates categories based on the hierarchical level map generated by
 	 * the model
@@ -230,8 +235,8 @@ class OverloadModelProcess extends FOFModel
 	private function makeCategories()
 	{
 		$logger = $this->getState('logger');
-		JLog::add('Creating categories');
-		
+		Log::add('Creating categories');
+
 		$levelMap = $this->getState('levelmap');
 		foreach($levelMap as $key => $id) {
 			$parts = explode('.',$key);
@@ -239,34 +244,34 @@ class OverloadModelProcess extends FOFModel
 			$parent = ($level == 1) ? 1 : $levelMap[ implode('.',  array_slice($parts, 0, count($parts) - 1)) ];
 			$id = $this->createCategory($level, $key, $parent);
 			$levelMap[$key] = $id;
-			
+
 			// Remove articles from category
 			$db = $this->getDbo();
 
 			$query = 'DELETE FROM #__assets WHERE `id` IN (SELECT `asset_id` FROM `#__content` WHERE `catid` = '.$db->q($id).')';
 			$db->setQuery($query);
-			$db->query(); // Whoosh!
+			$db->execute(); // Whoosh!
 
 			$query = $db->getQuery(true);
 			$query->delete('#__content')
 				->where($db->qn('catid').' = '.$db->q($id));
 			$db->setQuery($query);
-			$db->query();
+			$db->execute();
 		}
-		
-		JLog::add("Updating levelmap in model state", JLog::DEBUG);
-		
+
+		Log::add("Updating levelmap in model state", Log::DEBUG);
+
 		$this->setState('levelmap', $levelMap);
 	}
-	
+
 	/**
 	 * Create a single category and return its ID. If the category alias already
 	 * exists, return the ID of that specific category alias.
-	 * 
+	 *
 	 * @param type $level
 	 * @param type $levelpath
 	 * @param type $parent_id
-	 * @return type 
+	 * @return type
 	 */
 	private function createCategory($level = 1, $levelpath = '1', $parent_id = 1)
 	{
@@ -275,7 +280,7 @@ class OverloadModelProcess extends FOFModel
 		$alias = 'overload-';
 		$title .= $levelpath;
 		$alias .= str_replace('.', '-', $levelpath);
-		
+
 		$data = array(
 			'parent_id'		=> $parent_id,
 			'level'			=> $level,
@@ -292,12 +297,11 @@ class OverloadModelProcess extends FOFModel
 			'published'		=> 1
 		);
 
-		$basePath = JPATH_ADMINISTRATOR . '/components/com_categories';
-		require_once $basePath . '/models/category.php';
-		$config = array('table_path' => $basePath . '/tables');
-		$model = new CategoriesModelCategory($config);
+		$model = Factory::getApplication()->bootComponent('com_categories')
+			->getMVCFactory()->createModel('Category', 'Administrator', ['ignore_request' => true]);
+
 		$result = $model->save($data);
-		
+
 		if($result === false) {
 			$db = $this->getDbo();
 			$query = $db->getQuery(true);
@@ -307,8 +311,8 @@ class OverloadModelProcess extends FOFModel
 				->where($db->qn('alias').' = '.$db->q($alias));
 			$db->setQuery($query);
 			$id = $db->loadResult();
-			JLog::add("Existing category $levelpath, ID $id", JLog::DEBUG);
-			
+			Log::add("Existing category $levelpath, ID $id", Log::DEBUG);
+
 			// Enable an existing category
 			$cat = $model->getItem($id);
 			if(!$cat->published) {
@@ -316,26 +320,26 @@ class OverloadModelProcess extends FOFModel
 			}
 			$cat = (array)$cat;
 			$model->save($cat);
-			
+
 			return $id;
 		} else {
 			$id = $model->getState($model->getName().'.id');
-			JLog::add("New category $levelpath, ID $id", JLog::DEBUG);
+			Log::add("New category $levelpath, ID $id", Log::DEBUG);
 			return $id;
 		}
 	}
-	
+
 	/**
 	 * Creates a faux article inside the specified category
-	 * 
+	 *
 	 * @param type $cat_id
 	 * @param type $levelpath
-	 * @param type $currentArticle 
+	 * @param type $currentArticle
 	 */
 	private function createArticle($cat_id = '1', $levelpath = '1', $currentArticle = 1)
 	{
 		$data = $this->getArticleData($cat_id, $levelpath, $currentArticle);
-		
+
 		$db = $this->getDbo();
 		$data = (object)$data;
 		$data->attribs = json_encode($data->attribs);
@@ -344,37 +348,38 @@ class OverloadModelProcess extends FOFModel
 			die($db->getErrorMsg());
 		}
 	}
-	
+
 		/**
 	 * Creates a faux article inside the specified category
-	 * 
+	 *
 	 * @param type $cat_id
 	 * @param type $levelpath
-	 * @param type $currentArticle 
+	 * @param type $currentArticle
 	 */
 	private function createArticle_usingModel($cat_id = '1', $levelpath = '1', $currentArticle = 1)
 	{
 		$data = $this->getArticleData($cat_id, $levelpath, $currentArticle);
-		
-		require_once JPATH_ADMINISTRATOR.'/components/com_content/models/article.php';
-		$model = new ContentModelArticle();
+
+		$model = Factory::getApplication()->bootComponent('com_content')
+			->getMVCFactory()->createModel('Article', 'Administrator', ['ignore_request' => true]);
+
 		$result = $model->save($data);
 	}
-	
+
 	private function getArticleData($cat_id = '1', $levelpath = '1', $currentArticle = 1, $addPictures = true)
 	{
 		$logger = $this->getState('logger');
-		
+
 		$title = 'Overload Sample ';
 		$alias = 'overload-sample-';
 		$title .= $currentArticle.' in '.str_replace('.', '-', $levelpath);
 		$alias .= $currentArticle.'-in-'.str_replace('.', '-', $levelpath);
-		
-		$url = str_replace('/administrator', '', JURI::base(true));
+
+		$url = str_replace('/administrator', '', Uri::base(true));
 		$url = rtrim($url,'/');
 		$picture1 = $addPictures ? '<img src="'.$url.'/images/sampledata/fruitshop/apple.jpg" align="left" />' : '';
 		$picture2 = $addPictures ? '<img src="'.$url.'/images/sampledata/parks/animals/180px_koala_ag1.jpg" align="right" />' : '';
-		
+
 		$introtext = <<<ENDTEXT
 $picture1<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec auctor velit blandit risus posuere sit amet sollicitudin enim dictum. Nunc a commodo magna. Cras mattis, purus et ornare dictum, velit mi dictum nisl, sed rutrum massa eros nec leo. Sed at nibh nec felis dignissim tristique. Mauris sed posuere velit. Curabitur vehicula dui libero. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean iaculis felis ac elit euismod vitae venenatis dui iaculis. Morbi nec ipsum sit amet erat scelerisque auctor ac eget elit. Phasellus ut mattis ipsum. In auctor lacinia porttitor. Aliquam erat volutpat. In hac habitasse platea dictumst. Pellentesque iaculis mi ut ante tempor pharetra.</p>
 ENDTEXT;
@@ -384,14 +389,7 @@ ENDTEXT;
 $picture2<p>Nunc feugiat porta faucibus. Nulla facilisi. Sed viverra laoreet mollis. Morbi ullamcorper lorem a lacus porttitor tristique. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean <strong>consequat</strong> tincidunt lacinia. Maecenas dictum volutpat lacus, nec malesuada ipsum congue sed. Sed nec neque erat. Donec eros urna, vulputate ac elementum sit amet, pharetra sit amet urna. Phasellus in lectus metus. Proin vitae diam augue, vel lacinia lectus. Ut tincidunt, dolor sit amet hendrerit gravida, augue mauris bibendum sapien, nec porta ipsum diam eget erat. In porta nisl eget odio placerat gravida commodo tortor feugiat. Donec in tincidunt dui. In in neque tellus. Phasellus velit lacus, viverra et sodales nec, porta in velit.</p>
 <p>Etiam quis velit odio. Nunc dignissim enim vel enim blandit tempus. Integer pellentesque leo ac risus hendrerit sed consequat lacus elementum. Aenean placerat leo vitae nunc bibendum cursus. Ut ac dui diam. Vivamus massa tortor, consectetur at scelerisque eget, hendrerit et elit. Aliquam hendrerit quam posuere tellus sollicitudin sollicitudin. Ut eget lacinia metus. Curabitur vitae orci ac libero vestibulum commodo. Sed id nibh eu erat pretium tempus. Nullam suscipit fringilla tortor, ac pretium metus iaculis eu. Fusce pellentesque volutpat tortor, at interdum tortor blandit at. Morbi rhoncus euismod ultricies. Fusce sed massa at elit lobortis iaculis non id metus. Aliquam erat volutpat. Vivamus convallis mauris ut sapien tempus quis tempor nunc cursus. Quisque in lorem sem.</p>
 ENDTEXT;
-		jimport('joomla.utilities.date');
-		$jNow = new JDate();
-
-		if (version_compare(JVERSION, '3.0', 'ge')) {
-			$now = $jNow->toSql();
-		} else {
-			$now = $jNow->toMysql();
-		}
+		$now = (new \Joomla\CMS\Date\Date())->toSql();
 
 		$state  = (int) $this->getState('articlesstate', 1);
 
@@ -401,7 +399,6 @@ ENDTEXT;
 			'alias'			=> $alias,
 			'introtext'		=> $introtext,
 			'fulltext'		=> $fulltext,
-			'state'			=> $state,
 			'sectionid'		=> 0,
 			'mask'			=> 0,
 			'catid'			=> $cat_id,
@@ -423,7 +420,7 @@ ENDTEXT;
 			'metadata'		=> '{"tags":[]}',
 			'state'			=> $state
 		);
-		
+
 		return $data;
 	}
 }
