@@ -75,7 +75,6 @@ class ProcessModel extends BaseDatabaseModel
 	{
 		$categories = $this->getState('categories');
 		$depth = $this->getState('depth');
-		$logger = $this->getState('logger');
 
 		Log::add('Calculating total number of categories', Log::DEBUG);
 
@@ -111,7 +110,6 @@ class ProcessModel extends BaseDatabaseModel
 	 */
 	private function suspend()
 	{
-		$logger = $this->getState('logger');
 		Log::add('Saving model state to the session', Log::DEBUG);
 
 		$saveData = array(
@@ -138,8 +136,6 @@ class ProcessModel extends BaseDatabaseModel
 	 */
 	public function resume()
 	{
-		$logger = $this->getState('logger');
-
 		Log::add('Loading the model state from the session', Log::DEBUG);
 
 		$saveData = Factory::getSession()->get('savedata', '', 'comoverload');
@@ -172,7 +168,6 @@ class ProcessModel extends BaseDatabaseModel
 	 */
 	private function process()
 	{
-		$logger = $this->getState('logger');
 		Log::add('Entering main processing loop');
 
 		$articles = $this->getState('articles');
@@ -234,7 +229,6 @@ class ProcessModel extends BaseDatabaseModel
 	 */
 	private function makeCategories()
 	{
-		$logger = $this->getState('logger');
 		Log::add('Creating categories');
 
 		$levelMap = $this->getState('levelmap');
@@ -275,7 +269,6 @@ class ProcessModel extends BaseDatabaseModel
 	 */
 	private function createCategory($level = 1, $levelpath = '1', $parent_id = 1)
 	{
-		$logger = $this->getState('logger');
 		$title = 'Overload ';
 		$alias = 'overload-';
 		$title .= $levelpath;
@@ -297,6 +290,7 @@ class ProcessModel extends BaseDatabaseModel
 			'published'		=> 1
 		);
 
+		/** @var \Joomla\Component\Categories\Administrator\Model\CategoryModel $model */
 		$model = Factory::getApplication()->bootComponent('com_categories')
 			->getMVCFactory()->createModel('Category', 'Administrator', ['ignore_request' => true]);
 
@@ -360,6 +354,7 @@ class ProcessModel extends BaseDatabaseModel
 	{
 		$data = $this->getArticleData($cat_id, $levelpath, $currentArticle);
 
+		/** @var \Joomla\Component\Content\Administrator\Model\ArticleModel $model */
 		$model = Factory::getApplication()->bootComponent('com_content')
 			->getMVCFactory()->createModel('Article', 'Administrator', ['ignore_request' => true]);
 
@@ -368,8 +363,6 @@ class ProcessModel extends BaseDatabaseModel
 
 	private function getArticleData($cat_id = '1', $levelpath = '1', $currentArticle = 1, $addPictures = true)
 	{
-		$logger = $this->getState('logger');
-
 		$title = 'Overload Sample ';
 		$alias = 'overload-sample-';
 		$title .= $currentArticle.' in '.str_replace('.', '-', $levelpath);
@@ -417,8 +410,9 @@ ENDTEXT;
 			'featured'		=> 0,
 			'language'		=> '*',
 			'associations'	=> array(),
-			'metadata'		=> '{"tags":[]}',
-			'state'			=> $state
+			'metadata'		=> '{}',
+			'state'			=> $state,
+			'tags'          => array(),
 		);
 
 		return $data;

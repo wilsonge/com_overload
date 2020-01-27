@@ -44,7 +44,7 @@ function recalc()
 	
 	totalarticles = totalcats * articles;
 
-	document.getElementById('overload-projected-articles').innerHtml = '<b>' + totalarticles + '</b>';
+	document.getElementById('overload-projected-articles').innerHTML = '<b>' + totalarticles + '</b>';
 }
 
 /** @var The AJAX proxy URL */
@@ -61,19 +61,20 @@ function overload_start()
 	
 	document.getElementById('overload-wrapper').style.display = "none";
 	document.getElementById('overload-results-wrapper').style.display = "block";
-	
+	var responseData = {};
+
     Joomla.request({
         url: ajax_url + '?' + data,
         method: 'GET',
         onSuccess: (response) => {
 			try {
-				var data = JSON.parse(msg);
+				responseData = JSON.parse(response);
 			} catch(err) {
-				alert(msg);
+				alert(response);
 				return;
 			}
 
-			overload_process();
+			overload_process(responseData);
         },
         onError: (xhr) => {
 			var message = 'AJAX Loading Error: '+xhr.statusText;
@@ -95,18 +96,20 @@ function overload_process(msg)
 		alert('All done!');
 		return;
 	} else {
+		var responseData = {};
+
 	    Joomla.request({
 	        url: ajax_url + '?option=com_overload&task=process.resume',
 	        method: 'GET',
 	        onSuccess: (response) => {
 				try {
-					var data = JSON.parse(msg);
+					responseData = JSON.parse(response);
 				} catch(err) {
-					alert(msg);
+					alert(response);
 					return;
 				}
 	
-				overload_process();
+				overload_process(responseData);
 	        },
 	        onError: (xhr) => {
 				var message = 'AJAX Loading Error: '+xhr.statusText;

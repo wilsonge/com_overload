@@ -25,5 +25,5 @@ class DisplayController extends BaseController
 	 * @var    string
 	 * @since  1.6
 	 */
-	protected $default_view = 'start';
+	protected $default_view = 'cpanel';
 }
