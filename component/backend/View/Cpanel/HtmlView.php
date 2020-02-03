@@ -6,7 +6,7 @@
  * @version 1.0
  */
 
-namespace Wilsonge\Component\Overload\Administrator\View\Cpanels;
+namespace Wilsonge\Component\Overload\Administrator\View\Cpanel;
 
 defined('_JEXEC') or die();
 
