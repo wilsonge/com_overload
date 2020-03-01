@@ -64,7 +64,7 @@ defined('_JEXEC') or die(); ?>
 		</tr>
 		<tr>
 			<td colspan="2">
-				<button id="overload-start"><?php echo JText::_('COM_OVERLOAD_BUTTON_START')?></button>
+				<button class="btn btn-sm btn-primary" id="overload-start"><?php echo JText::_('COM_OVERLOAD_BUTTON_START')?></button>
 			</td>
 		</tr>
 	</table>
