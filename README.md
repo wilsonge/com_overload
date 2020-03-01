@@ -24,7 +24,7 @@ our ZIP packages.
 
 How to Install
 ===========================
-Run from the root of the repo `zip -r com_overload.zip . -x '*.git*' -x '*.idea*'`
+Run from the root of the repo `zip -r com_overload.zip . -x '*.git*' -x '*.idea*' -x 'README.md'`
 
 Original Source
 ===========================
