@@ -386,6 +386,18 @@ ENDTEXT;
 
 		$state  = (int) $this->getState('articlesstate', 1);
 
+		// TODO: Improve this to work with more than just the default workflow
+		$transitionIdMapping = [
+			// Trashed
+			'-2' => '3',
+			// Unpublished - omit!
+			'0' => '',
+			// Publish
+			'1' => '2',
+			// Archived?
+			'2' => '4',
+		];
+
 		$data = array(
 			'id'			=> 0,
 			'title'			=> $title,
@@ -411,7 +423,7 @@ ENDTEXT;
 			'language'		=> '*',
 			'associations'	=> array(),
 			'metadata'		=> '{}',
-			'state'			=> $state,
+			'transition'		=> $transitionIdMapping[$state],
 			'tags'          => array(),
 		);
 
